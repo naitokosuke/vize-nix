@@ -3,61 +3,75 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
+    { self, nixpkgs }:
+    let
+      supportedSystems = [
+        "aarch64-darwin"
+      ];
 
-        vize = pkgs.rustPlatform.buildRustPackage rec {
-          pname = "vize";
-          version = "0.0.1-alpha.19";
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-          src = pkgs.fetchFromGitHub {
-            owner = "ubugeeei";
-            repo = "vize";
-            rev = "v${version}";
-            hash = "sha256-t6gCHTrbY9ULYS0g9pxqa1UdcLqdufzr7ksbvZTuues=";
-          };
+      mkVize = pkgs: pkgs.rustPlatform.buildRustPackage rec {
+        pname = "vize";
+        version = "0.0.1-alpha.19";
 
-          cargoLock = {
-            lockFile = "${src}/Cargo.lock";
-          };
-
-          cargoBuildFlags = [
-            "-p"
-            "vize"
-          ];
-
-          meta = {
-            description = "High-performance Vue.js toolchain in Rust";
-            homepage = "https://github.com/ubugeeei/vize";
-            license = pkgs.lib.licenses.mit;
-            maintainers = [ ];
-            mainProgram = "vize";
-          };
+        src = pkgs.fetchFromGitHub {
+          owner = "ubugeeei";
+          repo = "vize";
+          rev = "v${version}";
+          hash = "sha256-t6gCHTrbY9ULYS0g9pxqa1UdcLqdufzr7ksbvZTuues=";
         };
-      in
-      {
-        packages = {
+
+        cargoLock = {
+          lockFile = "${src}/Cargo.lock";
+        };
+
+        cargoBuildFlags = [
+          "-p"
+          "vize"
+        ];
+
+        meta = {
+          description = "High-performance Vue.js toolchain in Rust";
+          homepage = "https://github.com/ubugeeei/vize";
+          license = pkgs.lib.licenses.mit;
+          maintainers = [ ];
+          mainProgram = "vize";
+        };
+      };
+    in
+    {
+      packages = forAllSystems (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          vize = mkVize pkgs;
+        in
+        {
           inherit vize;
           default = vize;
-        };
+        }
+      );
 
-        apps = {
-          vize = flake-utils.lib.mkApp {
-            drv = vize;
+      apps = forAllSystems (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          vize = mkVize pkgs;
+          app = {
+            type = "app";
+            program = "${vize}/bin/vize";
+            meta = {
+              description = "High-performance Vue.js toolchain in Rust";
+              mainProgram = "vize";
+            };
           };
-          default = self.apps.${system}.vize;
-        };
-      }
-    );
+        in
+        {
+          vize = app;
+          default = app;
+        }
+      );
+    };
 }
