@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest # aarch64-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+
+      - name: Build vize
+        run: nix build .#vize --print-build-logs
+
+      - name: Test vize runs
+        run: nix run .#vize -- --version
