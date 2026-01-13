@@ -33,7 +33,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          LATEST_VERSION=$(gh api repos/ubugeeei/vize/releases/latest --jq '.tag_name' | sed 's/^v//')
+          # Use tags API instead of releases (vize doesn't use GitHub Releases)
+          LATEST_VERSION=$(gh api repos/ubugeeei/vize/tags --jq '.[0].name' | sed 's/^v//')
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           echo "Latest version: $LATEST_VERSION"
 
@@ -86,8 +87,9 @@ jobs:
             - Updated source hash
             - Updated `flake.lock`
 
-            ### Release notes
-            https://github.com/ubugeeei/vize/releases/tag/v${{ steps.latest.outputs.version }}
+            ### Links
+            - Tag: https://github.com/ubugeeei/vize/tree/v${{ steps.latest.outputs.version }}
+            - Compare: https://github.com/ubugeeei/vize/compare/v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }}
 
             ---
             🤖 This PR was automatically created by GitHub Actions
