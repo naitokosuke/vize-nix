@@ -13,17 +13,15 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v16
-        with:
-          name: vize-nix
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
       - name: Install devenv
         run: nix profile install nixpkgs#devenv
 
       - name: Build vize
-        run: nix build .#vize --print-build-logs
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- build
 
       - name: Test vize runs
-        run: nix run .#vize -- --version
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- test
