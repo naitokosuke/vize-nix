@@ -89,10 +89,6 @@ jobs:
 
           echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
 
-      - name: Update flake.lock
-        if: steps.check.outputs.needs_update == 'true'
-        run: nix flake update
-
       - name: Verify build
         if: steps.check.outputs.needs_update == 'true'
         run: |
@@ -116,7 +112,6 @@ jobs:
             ### Changes
             - Updated version in `flake.nix`
             - Updated source hash
-            - Updated `flake.lock`
 
             ### Links
             - Tag: https://github.com/ubugeeei/vize/tree/v${{ steps.latest.outputs.version }}
