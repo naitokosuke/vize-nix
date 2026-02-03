@@ -39,8 +39,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          # Use tags API instead of releases (vize doesn't use GitHub Releases)
-          LATEST_VERSION=$(gh api repos/ubugeeei/vize/tags --jq '.[0].name' | sed 's/^v//')
+          # Fetch all tags and sort by semantic version to get the latest
+          # (GitHub API returns tags by creation date, not version order)
+          LATEST_VERSION=$(gh api repos/ubugeeei/vize/tags --paginate --jq '.[].name' | sed 's/^v//' | sort -V | tail -1)
           if [ -z "$LATEST_VERSION" ]; then
             echo "Error: Could not fetch latest version from GitHub"
             exit 1
