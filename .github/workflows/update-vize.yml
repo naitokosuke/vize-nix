@@ -67,8 +67,8 @@ jobs:
           set -e
           NEW_VERSION="${{ steps.latest.outputs.version }}"
 
-          # Update version
-          sed -i "s/version = \"[^\"]*\"/version = \"$NEW_VERSION\"/" flake.nix
+          # Update version (only first occurrence)
+          sed -i "0,/version = \"[^\"]*\"/s//version = \"$NEW_VERSION\"/" flake.nix
 
           # Get new hash using nix-prefetch
           echo "Fetching hash for version $NEW_VERSION..."
@@ -84,8 +84,8 @@ jobs:
           fi
           echo "Got hash: $NEW_HASH"
 
-          # Update hash
-          sed -i "s|hash = \"sha256-[^\"]*\"|hash = \"$NEW_HASH\"|" flake.nix
+          # Update hash (only first occurrence)
+          sed -i "0,/hash = \"sha256-[^\"]*\"/s||hash = \"$NEW_HASH\"|" flake.nix
 
           echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
 
