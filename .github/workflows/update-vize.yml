@@ -51,6 +51,7 @@ jobs:
       - name: Check if update is needed
         id: check
         run: |
+          set -e
           if [ "${{ steps.current.outputs.version }}" != "${{ steps.latest.outputs.version }}" ]; then
             echo "needs_update=true" >> $GITHUB_OUTPUT
             echo "Update needed: ${{ steps.current.outputs.version }} -> ${{ steps.latest.outputs.version }}"
