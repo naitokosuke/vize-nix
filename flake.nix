@@ -10,6 +10,7 @@
     let
       supportedSystems = [
         "aarch64-darwin"
+        "x86_64-linux"
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -48,10 +49,12 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           vize = mkVize pkgs;
+          workflowsModule = import ./workflows { inherit pkgs; };
         in
         {
           inherit vize;
           default = vize;
+          workflows = workflowsModule.default;
         }
       );
 
@@ -59,6 +62,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           vize = mkVize pkgs;
+          workflowsModule = import ./workflows { inherit pkgs; };
           app = {
             type = "app";
             program = "${vize}/bin/vize";
@@ -67,10 +71,22 @@
               mainProgram = "vize";
             };
           };
+          generateWorkflows = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "generate-workflows" ''
+              set -e
+              mkdir -p .github/workflows
+              for f in ${workflowsModule.default}/*.yml; do
+                cp "$f" .github/workflows/
+                echo "Generated: .github/workflows/$(basename "$f")"
+              done
+            '');
+          };
         in
         {
           vize = app;
           default = app;
+          generate-workflows = generateWorkflows;
         }
       );
     };

@@ -1,0 +1,153 @@
+# update-vize workflow definition
+{ lib }:
+{
+  name = "Update vize version";
+
+  on = lib.triggers.schedule [ "0 0,12 * * *" ] // lib.triggers.workflowDispatch;
+
+  jobs = {
+    check-update = {
+      runs-on = lib.runners.ubuntuLatest;
+
+      permissions = {
+        contents = lib.permissions.contents.write;
+        pull-requests = lib.permissions.pullRequests.write;
+      };
+
+      steps = [
+        lib.steps.checkout
+
+        lib.steps.installNix
+
+        lib.steps.magicNixCache
+
+        (lib.steps.setupCachix { name = "vize-nix"; })
+
+        {
+          name = "Get current version";
+          id = "current";
+          run = ''
+            set -e
+            CURRENT_VERSION=$(grep 'version = "' flake.nix | head -1 | sed 's/.*version = "\([^"]*\)".*/\1/')
+            if [ -z "$CURRENT_VERSION" ]; then
+              echo "Error: Could not extract current version from flake.nix"
+              exit 1
+            fi
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "Current version: $CURRENT_VERSION"
+          '';
+        }
+
+        {
+          name = "Get latest version from GitHub";
+          id = "latest";
+          env = {
+            GH_TOKEN = "\${{ github.token }}";
+          };
+          run = ''
+            set -e
+            # Fetch all tags and sort by semantic version to get the latest
+            # (GitHub API returns tags by creation date, not version order)
+            LATEST_VERSION=$(gh api repos/ubugeeei/vize/tags --paginate --jq '.[].name' | sed 's/^v//' | sort -V | tail -1)
+            if [ -z "$LATEST_VERSION" ]; then
+              echo "Error: Could not fetch latest version from GitHub"
+              exit 1
+            fi
+            echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "Latest version: $LATEST_VERSION"
+          '';
+        }
+
+        {
+          name = "Check if update is needed";
+          id = "check";
+          run = ''
+            set -e
+            if [ "${"$"}{{ steps.current.outputs.version }}" != "${"$"}{{ steps.latest.outputs.version }}" ]; then
+              echo "needs_update=true" >> $GITHUB_OUTPUT
+              echo "Update needed: ${"$"}{{ steps.current.outputs.version }} -> ${"$"}{{ steps.latest.outputs.version }}"
+            else
+              echo "needs_update=false" >> $GITHUB_OUTPUT
+              echo "Already up to date"
+            fi
+          '';
+        }
+
+        {
+          name = "Update flake.nix";
+          "if" = "steps.check.outputs.needs_update == 'true'";
+          run = ''
+            set -e
+            NEW_VERSION="${"$"}{{ steps.latest.outputs.version }}"
+
+            # Update version (only first occurrence)
+            sed -i "0,/version = \"[^\"]*\"/s//version = \"$NEW_VERSION\"/" flake.nix
+
+            # Get new hash using nix-prefetch
+            echo "Fetching hash for version $NEW_VERSION..."
+            PREFETCH_HASH=$(nix-prefetch-url --unpack "https://github.com/ubugeeei/vize/archive/refs/tags/v''${NEW_VERSION}.tar.gz")
+            if [ -z "$PREFETCH_HASH" ]; then
+              echo "Error: Failed to prefetch source"
+              exit 1
+            fi
+            NEW_HASH=$(nix hash to-sri --type sha256 "$PREFETCH_HASH")
+            if [ -z "$NEW_HASH" ]; then
+              echo "Error: Failed to convert hash to SRI format"
+              exit 1
+            fi
+            echo "Got hash: $NEW_HASH"
+
+            # Update hash (only first occurrence)
+            sed -i "0,/hash = \"sha256-[^\"]*\"/s||hash = \"$NEW_HASH\"|" flake.nix
+
+            echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
+          '';
+        }
+
+        {
+          name = "Verify build";
+          "if" = "steps.check.outputs.needs_update == 'true'";
+          run = ''
+            set -e
+            echo "Verifying build with updated flake.nix..."
+            nix build .#vize --no-link
+            echo "Build successful"
+          '';
+        }
+
+        {
+          name = "Create Pull Request";
+          "if" = "steps.check.outputs.needs_update == 'true'";
+          uses = lib.actions.createPullRequest;
+          "with" = {
+            token = "\${{ github.token }}";
+            commit-message = "feat: update vize to v\${{ steps.latest.outputs.version }}";
+            title = "feat: update vize to v\${{ steps.latest.outputs.version }}";
+            body = ''
+              ## 🚀 vize version update
+
+              Updates vize from `v${"$"}{{ steps.current.outputs.version }}` to `v${"$"}{{ steps.latest.outputs.version }}`
+
+              ### Changes
+              - Updated version in `flake.nix`
+              - Updated source hash
+
+              ### Links
+              - Tag: https://github.com/ubugeeei/vize/tree/v${"$"}{{ steps.latest.outputs.version }}
+              - Compare: https://github.com/ubugeeei/vize/compare/v${"$"}{{ steps.current.outputs.version }}...v${"$"}{{ steps.latest.outputs.version }}
+
+              ---
+              🤖 This PR was automatically created by GitHub Actions
+            '';
+            branch = "update-vize-\${{ steps.latest.outputs.version }}";
+            delete-branch = true;
+            labels = ''
+              dependencies
+              automated
+            '';
+          };
+        }
+      ];
+    };
+  };
+}
