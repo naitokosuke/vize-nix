@@ -24,7 +24,12 @@ jobs:
       - name: Get current version
         id: current
         run: |
+          set -e
           CURRENT_VERSION=$(grep 'version = "' flake.nix | head -1 | sed 's/.*version = "\([^"]*\)".*/\1/')
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "Error: Could not extract current version from flake.nix"
+            exit 1
+          fi
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
 
@@ -33,8 +38,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -e
           # Use tags API instead of releases (vize doesn't use GitHub Releases)
           LATEST_VERSION=$(gh api repos/ubugeeei/vize/tags --jq '.[0].name' | sed 's/^v//')
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "Error: Could not fetch latest version from GitHub"
+            exit 1
+          fi
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           echo "Latest version: $LATEST_VERSION"
 
@@ -52,19 +62,30 @@ jobs:
       - name: Update flake.nix
         if: steps.check.outputs.needs_update == 'true'
         run: |
+          set -e
           NEW_VERSION="${{ steps.latest.outputs.version }}"
 
           # Update version
           sed -i "s/version = \"[^\"]*\"/version = \"$NEW_VERSION\"/" flake.nix
 
           # Get new hash using nix-prefetch
-          NEW_HASH=$(nix-prefetch-url --unpack "https://github.com/ubugeeei/vize/archive/refs/tags/v${NEW_VERSION}.tar.gz" 2>/dev/null | xargs nix hash to-sri --type sha256)
+          echo "Fetching hash for version $NEW_VERSION..."
+          PREFETCH_HASH=$(nix-prefetch-url --unpack "https://github.com/ubugeeei/vize/archive/refs/tags/v${NEW_VERSION}.tar.gz")
+          if [ -z "$PREFETCH_HASH" ]; then
+            echo "Error: Failed to prefetch source"
+            exit 1
+          fi
+          NEW_HASH=$(nix hash to-sri --type sha256 "$PREFETCH_HASH")
+          if [ -z "$NEW_HASH" ]; then
+            echo "Error: Failed to convert hash to SRI format"
+            exit 1
+          fi
+          echo "Got hash: $NEW_HASH"
 
           # Update hash
           sed -i "s|hash = \"sha256-[^\"]*\"|hash = \"$NEW_HASH\"|" flake.nix
 
           echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
-          cat flake.nix
 
       - name: Update flake.lock
         if: steps.check.outputs.needs_update == 'true'
