@@ -28,3 +28,37 @@ jobs:
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- test
+
+      - name: Generate workflows from Nix
+        run: |
+          set -e
+          echo "Building workflows from Nix definitions..."
+          nix build .#workflows
+
+          echo "Copying generated workflows to .github/workflows/..."
+          for f in result/*.yml; do
+            filename=$(basename "$f")
+            cp "$f" ".github/workflows/$filename"
+            echo "Generated: .github/workflows/$filename"
+          done
+
+      - name: Check for workflow changes
+        id: workflow-changes
+        run: |
+          if git diff --quiet .github/workflows/; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No workflow changes detected"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Workflow changes detected:"
+            git diff .github/workflows/
+          fi
+
+      - name: Commit generated workflows
+        if: steps.workflow-changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/
+          git commit -m "chore: regenerate workflows from Nix definitions"
+          git push
