@@ -7,12 +7,8 @@ on:
 jobs:
   build:
     runs-on: macos-latest # aarch64-darwin
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@main
@@ -27,15 +23,14 @@ jobs:
           devenv shell -- build
           devenv shell -- test
 
-      - name: Generate and commit workflows from Nix
+      - name: Verify workflows are up to date
         run: |
           nix build .#workflows
-          cp result/*.yml .github/workflows/
-
-          if ! git diff --quiet .github/workflows/; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .github/workflows/
-            git commit -m "chore: regenerate workflows from Nix definitions"
-            git push
-          fi
+          for f in result/*.yml; do
+            filename=$(basename "$f")
+            diff -q "$f" ".github/workflows/$filename" || {
+              echo "ERROR: .github/workflows/$filename is out of sync with Nix definition"
+              echo "Run 'generate-workflows' locally and commit the changes"
+              exit 1
+            }
+          done
