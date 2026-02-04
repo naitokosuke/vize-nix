@@ -28,9 +28,11 @@ jobs:
           nix build .#workflows
           for f in result/*.yml; do
             filename=$(basename "$f")
-            diff -q "$f" ".github/workflows/$filename" || {
-              echo "ERROR: .github/workflows/$filename is out of sync with Nix definition"
-              echo "Run 'generate-workflows' locally and commit the changes"
+            if ! diff -q "$f" ".github/workflows/$filename" 2>/dev/null; then
+              echo "=== Generated $filename ==="
+              cat "$f"
+              echo "=== END ==="
+              echo "ERROR: .github/workflows/$filename is out of sync"
               exit 1
-            }
+            fi
           done
