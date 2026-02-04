@@ -9,6 +9,9 @@ jobs:
     runs-on: macos-latest # aarch64-darwin
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
