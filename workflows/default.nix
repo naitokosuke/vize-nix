@@ -18,11 +18,11 @@ let
       yj -jy < "$jsonPath" > "$out"
     '';
 
-  # Generate all workflows
-  allWorkflows = pkgs.symlinkJoin {
-    name = "github-workflows";
-    paths = builtins.attrValues (builtins.mapAttrs workflowToYaml workflows);
-  };
+  # Generate all workflows into a directory
+  allWorkflows = pkgs.runCommand "github-workflows" {} ''
+    mkdir -p $out
+    ${builtins.concatStringsSep "\n" (builtins.attrValues (builtins.mapAttrs (name: drv: "cp ${drv} $out/${name}.yml") workflowDerivations))}
+  '';
 
   # Individual workflow derivations
   workflowDerivations = builtins.mapAttrs workflowToYaml workflows;
