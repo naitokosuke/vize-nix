@@ -71,8 +71,11 @@ jobs:
           set -e
           NEW_VERSION="${{ steps.latest.outputs.version }}"
 
+          # Use GNU sed via Nix for compatibility with macOS
+          GSED="nix run nixpkgs#gnused --"
+
           # Update version (only first occurrence)
-          sed -i "0,/version = \"[^\"]*\"/s//version = \"$NEW_VERSION\"/" flake.nix
+          $GSED -i "0,/version = \"[^\"]*\"/s//version = \"$NEW_VERSION\"/" flake.nix
 
           # Get new hash using nix-prefetch
           echo "Fetching hash for version $NEW_VERSION..."
@@ -89,7 +92,7 @@ jobs:
           echo "Got hash: $NEW_HASH"
 
           # Update hash (only first occurrence)
-          sed -i "0,/hash = \"sha256-[^\"]*\"/s||hash = \"$NEW_HASH\"|" flake.nix
+          $GSED -i "0,/hash = \"sha256-[^\"]*\"/s||hash = \"$NEW_HASH\"|" flake.nix
 
           echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
 
