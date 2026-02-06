@@ -8,7 +8,7 @@ on:
 
 jobs:
   check-update:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest # aarch64-darwin
     permissions:
       contents: write
       pull-requests: write
