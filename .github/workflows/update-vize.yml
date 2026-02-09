@@ -108,7 +108,7 @@ jobs:
         if: steps.check.outputs.needs_update == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.VIZE_NIX_PR_TOKEN }}
           commit-message: "feat: update vize to v${{ steps.latest.outputs.version }}"
           title: "feat: update vize to v${{ steps.latest.outputs.version }}"
           body: |
