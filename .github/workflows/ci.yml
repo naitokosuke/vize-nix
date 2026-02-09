@@ -23,15 +23,8 @@ jobs:
           name: vize-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Install devenv
-        run: nix profile install nixpkgs#devenv
-
       - name: Build vize
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- build
+        run: nix build .#vize --print-build-logs
 
       - name: Test vize runs
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- test
+        run: nix run .#vize -- --version
