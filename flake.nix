@@ -34,6 +34,10 @@
           "vize"
         ];
 
+        # Skip tests during build: upstream test_backend_size requires a TTY
+        # which is unavailable in Nix sandbox / CI environments
+        doCheck = false;
+
         meta = {
           description = "High-performance Vue.js toolchain in Rust";
           homepage = "https://github.com/ubugeeei/vize";
