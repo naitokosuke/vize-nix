@@ -16,7 +16,11 @@ jobs:
       - name: Extract version from CHANGELOG
         id: version
         run: |
-          VERSION=$(grep -oP '(?<=## \[)[^\]]+(?=\])' CHANGELOG.md | head -1)
+          VERSION=$(grep -oP '(?<=## \[)[^\]]+(?=\])' CHANGELOG.md | grep -v '^Unreleased$' | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "No release version found in CHANGELOG.md"
+            VERSION="Unreleased"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 
