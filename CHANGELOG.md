@@ -13,6 +13,12 @@ This project uses the format: `<vize-version>-nix.<revision>`
 
 ## [Unreleased]
 
+## [0.1.0-alpha-nix.1] - 2026-02-22
+
+### Changed
+
+- Update vize to v0.1.0-alpha
+
 ## [0.0.1-alpha.120-nix.1] - 2026-02-21
 
 ### Changed
@@ -102,7 +108,8 @@ This project uses the format: `<vize-version>-nix.<revision>`
 - CI workflow for build checks
 - Binary caching via Cachix with devenv
 
-[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.0.1-alpha.120-nix.1...HEAD
+[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.1.0-alpha-nix.1...HEAD
+[0.1.0-alpha-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.0.1-alpha.120-nix.1...0.1.0-alpha-nix.1
 [0.0.1-alpha.120-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.0.1-alpha.114-nix.1...0.0.1-alpha.120-nix.1
 [0.0.1-alpha.114-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.0.1-alpha.102-nix.1...0.0.1-alpha.114-nix.1
 [0.0.1-alpha.102-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.0.1-alpha.101-nix.1...0.0.1-alpha.102-nix.1
