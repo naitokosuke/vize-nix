@@ -96,6 +96,67 @@ jobs:
 
           echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
 
+          # Handle git dependencies in Cargo.lock
+          echo "Checking for git dependencies in Cargo.lock..."
+          CARGO_LOCK_URL="https://raw.githubusercontent.com/ubugeeei/vize/v${NEW_VERSION}/Cargo.lock"
+          CARGO_LOCK=$(curl -fsSL "$CARGO_LOCK_URL")
+
+          # Extract unique git sources: "name-version" and git URL+rev
+          # Cargo.lock format: [[package]] blocks with source = "git+URL?...#rev"
+          GIT_DEPS=$(echo "$CARGO_LOCK" | awk '
+            /^\[\[package\]\]/ { name=""; version=""; source="" }
+            /^name = "/ { gsub(/^name = "|"$/, ""); name=$0 }
+            /^version = "/ { gsub(/^version = "|"$/, ""); version=$0 }
+            /^source = "git\+/ {
+              gsub(/^source = "|"$/, ""); source=$0
+              if (name != "" && version != "" && source != "") {
+                # Extract base URL (before ? or #)
+                url = source
+                gsub(/^git\+/, "", url)
+                gsub(/\?.*/, "", url)
+                gsub(/#.*/, "", url)
+                # Extract rev (after #)
+                rev = source
+                gsub(/.*#/, "", rev)
+                print name "-" version "|" url "|" rev
+              }
+            }
+          ' | sort -t'|' -k2,3 -u)
+
+          # Build outputHashes by prefetching each unique git source
+          OUTPUT_HASHES=""
+          SEEN_URLS=""
+          while IFS='|' read -r PKG_ID GIT_URL GIT_REV; do
+            [ -z "$PKG_ID" ] && continue
+            URL_KEY="${GIT_URL}#${GIT_REV}"
+            # Skip if we already processed this URL+rev
+            if echo "$SEEN_URLS" | grep -qF "$URL_KEY"; then
+              continue
+            fi
+            SEEN_URLS="${SEEN_URLS}${URL_KEY}\n"
+
+            echo "Prefetching git dependency: $PKG_ID from $GIT_URL@$GIT_REV"
+            DEP_HASH=$(nix run nixpkgs#nix-prefetch-git -- --quiet "$GIT_URL" "$GIT_REV" 2>/dev/null | nix run nixpkgs#jq -- -r '.hash')
+            if [ -z "$DEP_HASH" ] || [ "$DEP_HASH" = "null" ]; then
+              echo "Error: Failed to prefetch hash for $PKG_ID"
+              exit 1
+            fi
+            echo "Got hash for $PKG_ID: $DEP_HASH"
+            OUTPUT_HASHES="${OUTPUT_HASHES}            \"${PKG_ID}\" = \"${DEP_HASH}\";\n"
+          done <<< "$GIT_DEPS"
+
+          if [ -n "$OUTPUT_HASHES" ]; then
+            echo "Updating outputHashes in flake.nix..."
+            # Remove existing outputHashes block if present
+            $GSED -i '/outputHashes = {/,/};/d' flake.nix
+            # Insert new outputHashes after lockFile line
+            $GSED -i "/lockFile = \"\${src}\/Cargo.lock\";/a\\
+          outputHashes = {\n${OUTPUT_HASHES}          };" flake.nix
+          else
+            echo "No git dependencies found, removing outputHashes if present..."
+            $GSED -i '/outputHashes = {/,/};/d' flake.nix
+          fi
+
       - name: Update CHANGELOG.md
         if: steps.check.outputs.needs_update == 'true'
         run: |
