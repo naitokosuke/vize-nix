@@ -16,18 +16,18 @@
 
       mkVize = pkgs: pkgs.rustPlatform.buildRustPackage rec {
         pname = "vize";
-        version = "0.8.0";
+        version = "0.9.0";
 
         src = pkgs.fetchFromGitHub {
           owner = "ubugeeei";
           repo = "vize";
           rev = "v${version}";
-          hash = "sha256-A4WbJ6EKOaomNgodE/6xUdL8sLkrN9RdaWDteVBgXOw=";
+          hash = "sha256-SxZ0JwBWysZAGN8VsvpFbwmCL1vCfA2K2DXl4b+A1FI=";
         };
 
         cargoLock = {
           lockFile = "${src}/Cargo.lock";
-          outputHashes = {
+outputHashes = {
             "oxc_allocator-0.114.0" = "sha256-y9rrZAsfjyRSZOWjoDzHJFTa4O+ANF7U2SVTIUYqB9s=";
           };
         };
