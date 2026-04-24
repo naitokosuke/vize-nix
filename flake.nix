@@ -33,20 +33,20 @@
         in
         rustPlatform.buildRustPackage rec {
           pname = "vize";
-          version = "0.49.0";
+          version = "0.65.0";
 
           src = pkgs.fetchFromGitHub {
             owner = "ubugeeei";
             repo = "vize";
             rev = "v${version}";
-            hash = "sha256-DPnHmVrFn9b7dHb3HSgFFmFKH/6D8yfHbxUeYdIcW8E=";
+            hash = "sha256-2uUSFF4TsKFelDMGw5Zmiah/Jr1GINkcfkTQ0yXVWQU=";
           };
 
           cargoLock = {
             lockFile = "${src}/Cargo.lock";
-            outputHashes = {
-              "oxc_allocator-0.116.0" = "sha256-xnJ+lZwZh/F7KLebJcgPvPrAQrnlwQx9ldSJrljxnYs=";
-            };
+outputHashes = {
+            "oxc_allocator-0.127.0" = "sha256-At39BxG7xeI9niqHpU2jCwVI77NcQ/SeseXSLUQVWO8=";
+          };
           };
 
           cargoBuildFlags = [
