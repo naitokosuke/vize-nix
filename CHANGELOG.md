@@ -13,6 +13,10 @@ This project uses the format: `<vize-version>-nix.<revision>`
 
 ## [Unreleased]
 
+### Changed
+
+* Pin Rust toolchain via `rust-overlay` to decouple rustc from `nixpkgs-unstable` and avoid version skew when vize adopts newer rustc releases (#95)
+
 ## [0.49.0-nix.1] - 2026-04-21
 
 ### Changed
