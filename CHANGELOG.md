@@ -13,6 +13,12 @@ This project uses the format: `<vize-version>-nix.<revision>`
 
 ## [Unreleased]
 
+## [0.69.0-nix.1] - 2026-04-25
+
+### Changed
+
+- Update vize to v0.69.0
+
 ### Changed
 
 * Pin Rust toolchain via `rust-overlay` to decouple rustc from `nixpkgs-unstable` and avoid version skew when vize adopts newer rustc releases (#95)
@@ -267,7 +273,8 @@ This project uses the format: `<vize-version>-nix.<revision>`
 - CI workflow for build checks
 - Binary caching via Cachix with devenv
 
-[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.49.0-nix.1...HEAD
+[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.69.0-nix.1...HEAD
+[0.69.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.49.0-nix.1...0.69.0-nix.1
 [0.49.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.46.0-nix.1...0.49.0-nix.1
 [0.46.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.43.0-nix.1...0.46.0-nix.1
 [0.43.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.41.0-nix.1...0.43.0-nix.1
