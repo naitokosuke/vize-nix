@@ -33,13 +33,13 @@
         in
         rustPlatform.buildRustPackage rec {
           pname = "vize";
-          version = "0.70.0";
+          version = "0.72.0";
 
           src = pkgs.fetchFromGitHub {
             owner = "ubugeeei";
             repo = "vize";
             rev = "v${version}";
-            hash = "sha256-qo5b4cII16npd7Jf+tQYDRaHD9xwgXKkxJoKmGGwCkI=";
+            hash = "sha256-6toSJ/oytYKeVtbgFJeAFTsF04hKxCIhOKzf+2gVXls=";
           };
 
           cargoLock = {
