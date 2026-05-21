@@ -13,6 +13,12 @@ This project uses the format: `<vize-version>-nix.<revision>`
 
 ## [Unreleased]
 
+## [0.114.0-nix.1] - 2026-05-21
+
+### Changed
+
+- Update vize to v0.114.0
+
 ## [0.109.0-nix.1] - 2026-05-20
 
 ### Changed
@@ -340,12 +346,13 @@ This project uses the format: `<vize-version>-nix.<revision>`
 - Binary caching via Cachix with devenv
 
 <<<<<<< HEAD
-[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.109.0-nix.1...HEAD
+[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.114.0-nix.1...HEAD
+[0.114.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.109.0-nix.1...0.114.0-nix.1
 [0.109.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.107.0-nix.1...0.109.0-nix.1
 [0.107.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.104.0-nix.1...0.107.0-nix.1
 [0.104.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.90.0-nix.1...0.104.0-nix.1
 =======
-[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.109.0-nix.1...HEAD
+[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.114.0-nix.1...HEAD
 [0.102.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.90.0-nix.1...0.102.0-nix.1
 >>>>>>> origin/main
 [0.90.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.83.0-nix.1...0.90.0-nix.1
