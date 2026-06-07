@@ -13,6 +13,12 @@ This project uses the format: `<vize-version>-nix.<revision>`
 
 ## [Unreleased]
 
+## [0.184.0-nix.1] - 2026-06-07
+
+### Changed
+
+- Update vize to v0.184.0
+
 ## [0.174.0-nix.1] - 2026-06-06
 
 ### Changed
@@ -441,7 +447,8 @@ This project uses the format: `<vize-version>-nix.<revision>`
 - CI workflow for build checks
 - Binary caching via Cachix with devenv
 
-[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.174.0-nix.1...HEAD
+[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.184.0-nix.1...HEAD
+[0.184.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.174.0-nix.1...0.184.0-nix.1
 [0.174.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.168.0-nix.1...0.174.0-nix.1
 [0.168.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.167.0-nix.1...0.168.0-nix.1
 [0.167.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.166.0-nix.1...0.167.0-nix.1
