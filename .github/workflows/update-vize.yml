@@ -37,17 +37,17 @@ jobs:
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
 
-      - name: Get latest version from GitHub
+      - name: Get latest release from upstream
         id: latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          # Fetch all tags and sort by semantic version to get the latest
-          # (GitHub API returns tags by creation date, not version order)
-          LATEST_VERSION=$(gh api repos/ubugeeei/vize/tags --paginate --jq '.[].name' | sed 's/^v//' | sort -V | tail -1)
+          # We track binary releases from ubugeeei-prod/vize (where the
+          # prebuilt artifacts our flake depends on are published).
+          LATEST_VERSION=$(gh api repos/ubugeeei-prod/vize/releases/latest --jq '.tag_name | sub("^v"; "")')
           if [ -z "$LATEST_VERSION" ]; then
-            echo "Error: Could not fetch latest version from GitHub"
+            echo "Error: Could not fetch latest release from ubugeeei-prod/vize"
             exit 1
           fi
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
@@ -77,85 +77,30 @@ jobs:
           # Update version (only first occurrence)
           $GSED -i "0,/version = \"[^\"]*\"/s//version = \"$NEW_VERSION\"/" flake.nix
 
-          # Get new hash using nix-prefetch
-          echo "Fetching hash for version $NEW_VERSION..."
-          PREFETCH_HASH=$(nix-prefetch-url --unpack "https://github.com/ubugeeei/vize/archive/refs/tags/v${NEW_VERSION}.tar.gz")
-          if [ -z "$PREFETCH_HASH" ]; then
-            echo "Error: Failed to prefetch source"
-            exit 1
-          fi
-          NEW_HASH=$(nix hash to-sri --type sha256 "$PREFETCH_HASH")
-          if [ -z "$NEW_HASH" ]; then
-            echo "Error: Failed to convert hash to SRI format"
-            exit 1
-          fi
-          echo "Got hash: $NEW_HASH"
-
-          # Update hash (only first occurrence)
-          $GSED -i "0,/hash = \"sha256-[^\"]*\"/s||hash = \"$NEW_HASH\"|" flake.nix
-
-          echo "Updated to version $NEW_VERSION with hash $NEW_HASH"
-
-          # Handle git dependencies in Cargo.lock
-          echo "Checking for git dependencies in Cargo.lock..."
-          CARGO_LOCK_URL="https://raw.githubusercontent.com/ubugeeei/vize/v${NEW_VERSION}/Cargo.lock"
-          CARGO_LOCK=$(curl -fsSL "$CARGO_LOCK_URL")
-
-          # Extract unique git sources: "name-version" and git URL+rev
-          # Cargo.lock format: [[package]] blocks with source = "git+URL?...#rev"
-          GIT_DEPS=$(echo "$CARGO_LOCK" | awk '
-            /^\[\[package\]\]/ { name=""; version=""; source="" }
-            /^name = "/ { gsub(/^name = "|"$/, ""); name=$0 }
-            /^version = "/ { gsub(/^version = "|"$/, ""); version=$0 }
-            /^source = "git\+/ {
-              gsub(/^source = "|"$/, ""); source=$0
-              if (name != "" && version != "" && source != "") {
-                # Extract base URL (before ? or #)
-                url = source
-                gsub(/^git\+/, "", url)
-                gsub(/\?.*/, "", url)
-                gsub(/#.*/, "", url)
-                # Extract rev (after #)
-                rev = source
-                gsub(/.*#/, "", rev)
-                print name "-" version "|" url "|" rev
-              }
-            }
-          ' | sort -t'|' -k2,3 -u)
-
-          # Build outputHashes by prefetching each unique git source
-          OUTPUT_HASHES=""
-          SEEN_URLS=""
-          while IFS='|' read -r PKG_ID GIT_URL GIT_REV; do
-            [ -z "$PKG_ID" ] && continue
-            URL_KEY="${GIT_URL}#${GIT_REV}"
-            # Skip if we already processed this URL+rev
-            if echo "$SEEN_URLS" | grep -qF "$URL_KEY"; then
-              continue
-            fi
-            SEEN_URLS="${SEEN_URLS}${URL_KEY}\n"
-
-            echo "Prefetching git dependency: $PKG_ID from $GIT_URL@$GIT_REV"
-            DEP_HASH=$(nix run nixpkgs#nix-prefetch-git -- --quiet "$GIT_URL" "$GIT_REV" 2>/dev/null | nix run nixpkgs#jq -- -r '.hash')
-            if [ -z "$DEP_HASH" ] || [ "$DEP_HASH" = "null" ]; then
-              echo "Error: Failed to prefetch hash for $PKG_ID"
+          # Update per-platform release-asset hashes.
+          # Each entry: rust-target (used in asset filename) | nix system (informational)
+          PLATFORMS="aarch64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu"
+          for TARGET in $PLATFORMS; do
+            ASSET="vize-${TARGET}.tar.gz"
+            URL="https://github.com/ubugeeei-prod/vize/releases/download/v${NEW_VERSION}/${ASSET}"
+            echo "Prefetching ${ASSET}..."
+            PREFETCH_HASH=$(nix-prefetch-url "$URL")
+            if [ -z "$PREFETCH_HASH" ]; then
+              echo "Error: Failed to prefetch $ASSET"
               exit 1
             fi
-            echo "Got hash for $PKG_ID: $DEP_HASH"
-            OUTPUT_HASHES="${OUTPUT_HASHES}            \"${PKG_ID}\" = \"${DEP_HASH}\";\n"
-          done <<< "$GIT_DEPS"
+            SRI_HASH=$(nix hash to-sri --type sha256 "$PREFETCH_HASH")
+            if [ -z "$SRI_HASH" ]; then
+              echo "Error: Failed to convert hash to SRI format for $ASSET"
+              exit 1
+            fi
+            echo "Got hash for $ASSET: $SRI_HASH"
+            # Range-sed: from the asset line until the next hash line within the
+            # same attrset, replace the SRI hash.
+            $GSED -i "/asset = \"${ASSET}\";/,/hash = / { s|hash = \"sha256-[^\"]*\"|hash = \"${SRI_HASH}\"|; }" flake.nix
+          done
 
-          if [ -n "$OUTPUT_HASHES" ]; then
-            echo "Updating outputHashes in flake.nix..."
-            # Remove existing outputHashes block if present
-            $GSED -i '/outputHashes = {/,/};/d' flake.nix
-            # Insert new outputHashes after lockFile line
-            $GSED -i "/lockFile = \"\${src}\/Cargo.lock\";/a\\
-          outputHashes = {\n${OUTPUT_HASHES}          };" flake.nix
-          else
-            echo "No git dependencies found, removing outputHashes if present..."
-            $GSED -i '/outputHashes = {/,/};/d' flake.nix
-          fi
+          echo "Updated flake.nix to version $NEW_VERSION"
 
       - name: Update CHANGELOG.md
         if: steps.check.outputs.needs_update == 'true'
@@ -209,11 +154,11 @@ jobs:
 
             ### Changes
             - Updated version in `flake.nix`
-            - Updated source hash
+            - Updated per-platform release-asset hashes (aarch64-darwin, aarch64-linux, x86_64-linux)
             - Updated `CHANGELOG.md`
 
             ### Links
-            - Tag: https://github.com/ubugeeei/vize/tree/v${{ steps.latest.outputs.version }}
+            - Release: https://github.com/ubugeeei-prod/vize/releases/tag/v${{ steps.latest.outputs.version }}
             - Compare: https://github.com/ubugeeei/vize/compare/v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }}
 
             ---
