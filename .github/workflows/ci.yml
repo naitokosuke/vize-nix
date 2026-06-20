@@ -33,7 +33,11 @@ jobs:
   build:
     needs: changes
     if: needs.changes.outputs.needs_build == 'true'
-    runs-on: macos-latest # aarch64-darwin
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
