@@ -3,60 +3,56 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
-    { self, nixpkgs, rust-overlay }:
+    { self, nixpkgs }:
     let
-      supportedSystems = [
-        "aarch64-darwin"
-      ];
+      version = "0.241.0";
 
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-
-      pkgsFor = system: import nixpkgs {
-        inherit system;
-        overlays = [ (import rust-overlay) ];
+      sources = {
+        "aarch64-darwin" = {
+          asset = "vize-aarch64-apple-darwin.tar.gz";
+          hash = "sha256-C0SNhi47Q8EnVoaskE8sUQ0WnpJfAPnMFaGnhwQaKaY=";
+        };
+        "aarch64-linux" = {
+          asset = "vize-aarch64-unknown-linux-gnu.tar.gz";
+          hash = "sha256-2BCFoQQu95jmMMdUCfVZ/+QHV6VPreCqbV9WmTYI0jk=";
+        };
+        "x86_64-linux" = {
+          asset = "vize-x86_64-unknown-linux-gnu.tar.gz";
+          hash = "sha256-VaF2gbhR/+zqeh7pkkg7IUSDEzMp7bkm+I0bbZdExyg=";
+        };
       };
 
-      mkVize = pkgs:
+      supportedSystems = builtins.attrNames sources;
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+
+      mkVize = system:
         let
-          rustToolchain = pkgs.rust-bin.stable.latest.default;
-          rustPlatform = pkgs.makeRustPlatform {
-            cargo = rustToolchain;
-            rustc = rustToolchain;
-          };
+          pkgs = nixpkgs.legacyPackages.${system};
+          src = sources.${system};
+          isLinux = pkgs.stdenv.hostPlatform.isLinux;
         in
-        rustPlatform.buildRustPackage rec {
+        pkgs.stdenv.mkDerivation {
           pname = "vize";
-          version = "0.241.0";
+          inherit version;
 
-          src = pkgs.fetchFromGitHub {
-            owner = "ubugeeei";
-            repo = "vize";
-            rev = "v${version}";
-            hash = "sha256-fZDBbRYckop/a5j8u1832GhiXFECHOcDMp6yOyPt+gs=";
+          src = pkgs.fetchurl {
+            url = "https://github.com/ubugeeei-prod/vize/releases/download/v${version}/${src.asset}";
+            hash = src.hash;
           };
 
-          cargoLock = {
-            lockFile = "${src}/Cargo.lock";
-outputHashes = {
-            "oxc_allocator-0.127.0" = "sha256-At39BxG7xeI9niqHpU2jCwVI77NcQ/SeseXSLUQVWO8=";
-          };
-          };
+          sourceRoot = ".";
 
-          cargoBuildFlags = [
-            "-p"
-            "vize"
-          ];
+          nativeBuildInputs = pkgs.lib.optional isLinux pkgs.autoPatchelfHook;
+          buildInputs = pkgs.lib.optionals isLinux [ pkgs.stdenv.cc.cc.lib ];
 
-          # Skip tests during build: upstream test_backend_size requires a TTY
-          # which is unavailable in Nix sandbox / CI environments
-          doCheck = false;
+          installPhase = ''
+            runHook preInstall
+            install -Dm755 vize $out/bin/vize
+            runHook postInstall
+          '';
 
           meta = {
             description = "High-performance Vue.js toolchain in Rust";
@@ -64,15 +60,14 @@ outputHashes = {
             license = pkgs.lib.licenses.mit;
             maintainers = [ ];
             mainProgram = "vize";
+            platforms = supportedSystems;
+            sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
           };
         };
     in
     {
       packages = forAllSystems (system:
-        let
-          pkgs = pkgsFor system;
-          vize = mkVize pkgs;
-        in
+        let vize = mkVize system; in
         {
           inherit vize;
           default = vize;
@@ -81,8 +76,7 @@ outputHashes = {
 
       apps = forAllSystems (system:
         let
-          pkgs = pkgsFor system;
-          vize = mkVize pkgs;
+          vize = mkVize system;
           app = {
             type = "app";
             program = "${vize}/bin/vize";
