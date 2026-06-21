@@ -8,20 +8,20 @@
   outputs =
     { self, nixpkgs }:
     let
-      version = "0.241.0";
+      version = "0.243.0";
 
       sources = {
         "aarch64-darwin" = {
           asset = "vize-aarch64-apple-darwin.tar.gz";
-          hash = "sha256-C0SNhi47Q8EnVoaskE8sUQ0WnpJfAPnMFaGnhwQaKaY=";
+          hash = "sha256-ioWQ6mUUbTYZN2kaNaNFxyJgO7f/26IO25T0jSd0T0k=";
         };
         "aarch64-linux" = {
           asset = "vize-aarch64-unknown-linux-gnu.tar.gz";
-          hash = "sha256-2BCFoQQu95jmMMdUCfVZ/+QHV6VPreCqbV9WmTYI0jk=";
+          hash = "sha256-SSCC/aJceOFnaoM1YbXM7t+TtdEIpqDNPCi+AQy1dQA=";
         };
         "x86_64-linux" = {
           asset = "vize-x86_64-unknown-linux-gnu.tar.gz";
-          hash = "sha256-VaF2gbhR/+zqeh7pkkg7IUSDEzMp7bkm+I0bbZdExyg=";
+          hash = "sha256-k6E6bycPP7S3UeZAW/4g53LsK521umseIBJY9uu5HpM=";
         };
       };
 
