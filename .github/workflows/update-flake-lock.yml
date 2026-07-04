@@ -1,0 +1,27 @@
+name: Update flake.lock
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Update flake.lock
+        uses: DeterminateSystems/update-flake-lock@v24
+        with:
+          token: ${{ secrets.VIZE_NIX_PR_TOKEN }}
+          pr-title: 'chore: update flake.lock'
+          pr-labels: |
+            dependencies
+            automated

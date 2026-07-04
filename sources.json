@@ -1,0 +1,9 @@
+{
+  "version": "0.276.0",
+  "sources": {
+    "aarch64-darwin": {
+      "asset": "vize-aarch64-apple-darwin.tar.gz",
+      "hash": "sha256-JFGTaSNFAG9/W04AADtAcORkjXEdMgfWFcZ2EKqBV8s="
+    }
+  }
+}

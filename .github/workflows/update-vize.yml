@@ -2,13 +2,12 @@ name: Update vize version
 
 on:
   schedule:
-    # Check every 12 hours (at 00:00 and 12:00 UTC)
     - cron: '0 0,12 * * *'
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch:
 
 jobs:
-  check-update:
-    runs-on: macos-latest # aarch64-darwin
+  update:
+    runs-on: macos-latest
     permissions:
       contents: write
       pull-requests: write
@@ -25,145 +24,90 @@ jobs:
           name: vize-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Get current version
-        id: current
-        run: |
-          set -e
-          CURRENT_VERSION=$(grep 'version = "' flake.nix | head -1 | sed 's/.*version = "\([^"]*\)".*/\1/')
-          if [ -z "$CURRENT_VERSION" ]; then
-            echo "Error: Could not extract current version from flake.nix"
-            exit 1
-          fi
-          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $CURRENT_VERSION"
-
-      - name: Get latest release from upstream
-        id: latest
+      - name: Get versions
+        id: versions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -e
-          # We track binary releases from ubugeeei-prod/vize (where the
-          # prebuilt artifacts our flake depends on are published).
-          LATEST_VERSION=$(gh api repos/ubugeeei-prod/vize/releases/latest --jq '.tag_name | sub("^v"; "")')
-          if [ -z "$LATEST_VERSION" ]; then
-            echo "Error: Could not fetch latest release from ubugeeei-prod/vize"
-            exit 1
-          fi
-          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "Latest version: $LATEST_VERSION"
+          set -euo pipefail
+          CURRENT=$(jq -er '.version' sources.json)
+          # binary releases live on ubugeeei-prod/vize, not ubugeeei/vize
+          LATEST=$(gh api repos/ubugeeei-prod/vize/releases/latest --jq '.tag_name | sub("^v"; "")')
+          [ -n "$LATEST" ]
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Current: $CURRENT / Latest: $LATEST"
 
-      - name: Check if update is needed
-        id: check
+      - name: Update sources.json
+        if: steps.versions.outputs.current != steps.versions.outputs.latest
         run: |
-          set -e
-          if [ "${{ steps.current.outputs.version }}" != "${{ steps.latest.outputs.version }}" ]; then
-            echo "needs_update=true" >> $GITHUB_OUTPUT
-            echo "Update needed: ${{ steps.current.outputs.version }} -> ${{ steps.latest.outputs.version }}"
-          else
-            echo "needs_update=false" >> $GITHUB_OUTPUT
-            echo "Already up to date"
-          fi
+          set -euo pipefail
+          NEW_VERSION="${{ steps.versions.outputs.latest }}"
 
-      - name: Update flake.nix
-        if: steps.check.outputs.needs_update == 'true'
-        run: |
-          set -e
-          NEW_VERSION="${{ steps.latest.outputs.version }}"
+          jq --arg version "$NEW_VERSION" '.version = $version' sources.json > sources.json.tmp
+          mv sources.json.tmp sources.json
 
-          # Use GNU sed via Nix for compatibility with macOS
-          GSED="nix run nixpkgs#gnused --"
-
-          # Update version (only first occurrence)
-          $GSED -i "0,/version = \"[^\"]*\"/s//version = \"$NEW_VERSION\"/" flake.nix
-
-          # Update per-platform release-asset hashes.
-          # Each entry: rust-target (used in asset filename) | nix system (informational)
-          PLATFORMS="aarch64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu"
-          for TARGET in $PLATFORMS; do
-            ASSET="vize-${TARGET}.tar.gz"
+          for SYSTEM in $(jq -r '.sources | keys[]' sources.json); do
+            ASSET=$(jq -er --arg system "$SYSTEM" '.sources[$system].asset' sources.json)
             URL="https://github.com/ubugeeei-prod/vize/releases/download/v${NEW_VERSION}/${ASSET}"
             echo "Prefetching ${ASSET}..."
-            PREFETCH_HASH=$(nix-prefetch-url "$URL")
-            if [ -z "$PREFETCH_HASH" ]; then
-              echo "Error: Failed to prefetch $ASSET"
-              exit 1
-            fi
-            SRI_HASH=$(nix hash to-sri --type sha256 "$PREFETCH_HASH")
-            if [ -z "$SRI_HASH" ]; then
-              echo "Error: Failed to convert hash to SRI format for $ASSET"
-              exit 1
-            fi
-            echo "Got hash for $ASSET: $SRI_HASH"
-            # Range-sed: from the asset line until the next hash line within the
-            # same attrset, replace the SRI hash.
-            $GSED -i "/asset = \"${ASSET}\";/,/hash = / { s|hash = \"sha256-[^\"]*\"|hash = \"${SRI_HASH}\"|; }" flake.nix
+            HASH=$(nix store prefetch-file --json "$URL" | jq -er '.hash')
+            jq --arg system "$SYSTEM" --arg hash "$HASH" \
+              '.sources[$system].hash = $hash' sources.json > sources.json.tmp
+            mv sources.json.tmp sources.json
           done
 
-          echo "Updated flake.nix to version $NEW_VERSION"
-
       - name: Update CHANGELOG.md
-        if: steps.check.outputs.needs_update == 'true'
+        if: steps.versions.outputs.current != steps.versions.outputs.latest
         run: |
-          set -e
-          NEW_VERSION="${{ steps.latest.outputs.version }}"
-          NEW_TAG_VERSION="${NEW_VERSION}-nix.1"
+          set -euo pipefail
+          NEW_VERSION="${{ steps.versions.outputs.latest }}"
+          NEW_TAG="${NEW_VERSION}-nix.1"
           TODAY=$(date +%Y-%m-%d)
+          PREV_TAG=$(awk -F'[][]' '/^## \[/ && $2 != "Unreleased" { print $2; exit }' CHANGELOG.md)
 
-          # Use GNU sed via Nix for compatibility with macOS
-          GSED="nix run nixpkgs#gnused --"
-
-          # Get previous release version from CHANGELOG (skip Unreleased)
-          PREV_TAG_VERSION=$($GSED -n 's/^## \[\([^]]*\)\].*/\1/p' CHANGELOG.md | grep -v '^Unreleased$' | head -1)
-
-          # Insert new version section after ## [Unreleased]
-          $GSED -i "/^## \[Unreleased\]/a\\\\n## [${NEW_TAG_VERSION}] - ${TODAY}\\n\\n### Changed\\n\\n- Update vize to v${NEW_VERSION}" CHANGELOG.md
-
-          # Update [Unreleased] compare link
-          $GSED -i "s|\[Unreleased\]: .*|[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/${NEW_TAG_VERSION}...HEAD|" CHANGELOG.md
-
-          # Add new version compare link before the previous version link
-          if [ -n "$PREV_TAG_VERSION" ]; then
-            $GSED -i "/^\[${PREV_TAG_VERSION}\]/i [${NEW_TAG_VERSION}]: https://github.com/naitokosuke/vize-nix/compare/${PREV_TAG_VERSION}...${NEW_TAG_VERSION}" CHANGELOG.md
-          else
-            # No previous version - add link at the end
-            echo "[${NEW_TAG_VERSION}]: https://github.com/naitokosuke/vize-nix/releases/tag/${NEW_TAG_VERSION}" >> CHANGELOG.md
-          fi
-
-          echo "Updated CHANGELOG.md with version ${NEW_TAG_VERSION}"
+          awk -v new_tag="$NEW_TAG" -v prev_tag="$PREV_TAG" -v today="$TODAY" -v upstream="$NEW_VERSION" '
+            /^## \[Unreleased\]$/ {
+              print
+              print ""
+              print "## [" new_tag "] - " today
+              print ""
+              print "### Changed"
+              print ""
+              print "- Update vize to v" upstream
+              next
+            }
+            /^\[Unreleased\]: / {
+              print "[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/" new_tag "...HEAD"
+              print "[" new_tag "]: https://github.com/naitokosuke/vize-nix/compare/" prev_tag "..." new_tag
+              next
+            }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.md.tmp
+          mv CHANGELOG.md.tmp CHANGELOG.md
 
       - name: Verify build
-        if: steps.check.outputs.needs_update == 'true'
+        if: steps.versions.outputs.current != steps.versions.outputs.latest
         run: |
-          set -e
-          echo "Verifying build with updated flake.nix..."
-          nix build .#vize --no-link
-          echo "Build successful"
+          set -euo pipefail
+          nix flake check --print-build-logs
+          nix run . -- --version
 
       - name: Create Pull Request
-        if: steps.check.outputs.needs_update == 'true'
-        uses: peter-evans/create-pull-request@v6
+        if: steps.versions.outputs.current != steps.versions.outputs.latest
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.VIZE_NIX_PR_TOKEN }}
-          commit-message: "feat: update vize to v${{ steps.latest.outputs.version }}"
-          title: "feat: update vize to v${{ steps.latest.outputs.version }}"
+          commit-message: 'feat: update vize to v${{ steps.versions.outputs.latest }}'
+          title: 'feat: update vize to v${{ steps.versions.outputs.latest }}'
           body: |
-            ## 🚀 vize version update
+            Updates vize from `v${{ steps.versions.outputs.current }}` to `v${{ steps.versions.outputs.latest }}`.
 
-            Updates vize from `v${{ steps.current.outputs.version }}` to `v${{ steps.latest.outputs.version }}`
+            - Release: https://github.com/ubugeeei-prod/vize/releases/tag/v${{ steps.versions.outputs.latest }}
+            - Compare: https://github.com/ubugeeei/vize/compare/v${{ steps.versions.outputs.current }}...v${{ steps.versions.outputs.latest }}
 
-            ### Changes
-            - Updated version in `flake.nix`
-            - Updated per-platform release-asset hashes (aarch64-darwin, aarch64-linux, x86_64-linux)
-            - Updated `CHANGELOG.md`
-
-            ### Links
-            - Release: https://github.com/ubugeeei-prod/vize/releases/tag/v${{ steps.latest.outputs.version }}
-            - Compare: https://github.com/ubugeeei/vize/compare/v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }}
-
-            ---
             🤖 This PR was automatically created by GitHub Actions
-          branch: update-vize-${{ steps.latest.outputs.version }}
+          branch: update-vize
           delete-branch: true
           labels: |
             dependencies

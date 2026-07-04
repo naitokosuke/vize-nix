@@ -8,45 +8,26 @@
   outputs =
     { self, nixpkgs }:
     let
-      version = "0.276.0";
-
-      sources = {
-        "aarch64-darwin" = {
-          asset = "vize-aarch64-apple-darwin.tar.gz";
-          hash = "sha256-JFGTaSNFAG9/W04AADtAcORkjXEdMgfWFcZ2EKqBV8s=";
-        };
-        "aarch64-linux" = {
-          asset = "vize-aarch64-unknown-linux-gnu.tar.gz";
-          hash = "sha256-AzHX6AiXgjjewpQDCNtDS9WMX1d5cT5Edud5s3ZPWrE=";
-        };
-        "x86_64-linux" = {
-          asset = "vize-x86_64-unknown-linux-gnu.tar.gz";
-          hash = "sha256-T8v8kBNBcVVGghqwbSJ8Dg4xx0Xbs2y//u5NOedhwls=";
-        };
-      };
+      inherit (builtins.fromJSON (builtins.readFile ./sources.json)) version sources;
 
       supportedSystems = builtins.attrNames sources;
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-      mkVize = system:
+      mkVize =
+        system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          src = sources.${system};
-          isLinux = pkgs.stdenv.hostPlatform.isLinux;
         in
         pkgs.stdenv.mkDerivation {
           pname = "vize";
           inherit version;
 
           src = pkgs.fetchurl {
-            url = "https://github.com/ubugeeei-prod/vize/releases/download/v${version}/${src.asset}";
-            hash = src.hash;
+            url = "https://github.com/ubugeeei-prod/vize/releases/download/v${version}/${sources.${system}.asset}";
+            inherit (sources.${system}) hash;
           };
 
           sourceRoot = ".";
-
-          nativeBuildInputs = pkgs.lib.optional isLinux pkgs.autoPatchelfHook;
-          buildInputs = pkgs.lib.optionals isLinux [ pkgs.stdenv.cc.cc.lib ];
 
           installPhase = ''
             runHook preInstall
@@ -54,11 +35,13 @@
             runHook postInstall
           '';
 
+          nativeInstallCheckInputs = [ pkgs.versionCheckHook ];
+          doInstallCheck = true;
+
           meta = {
             description = "High-performance Vue.js toolchain in Rust";
-            homepage = "https://github.com/ubugeeei/vize";
+            homepage = "https://vizejs.dev";
             license = pkgs.lib.licenses.mit;
-            maintainers = [ ];
             mainProgram = "vize";
             platforms = supportedSystems;
             sourceProvenance = with pkgs.lib.sourceTypes; [ binaryNativeCode ];
@@ -66,30 +49,17 @@
         };
     in
     {
-      packages = forAllSystems (system:
-        let vize = mkVize system; in
-        {
-          inherit vize;
-          default = vize;
-        }
-      );
+      packages = forAllSystems (system: rec {
+        vize = mkVize system;
+        default = vize;
+      });
 
-      apps = forAllSystems (system:
-        let
-          vize = mkVize system;
-          app = {
-            type = "app";
-            program = "${vize}/bin/vize";
-            meta = {
-              description = "High-performance Vue.js toolchain in Rust";
-              mainProgram = "vize";
-            };
-          };
-        in
-        {
-          vize = app;
-          default = app;
-        }
-      );
+      overlays.default = final: prev: {
+        vize = self.packages.${prev.stdenv.hostPlatform.system}.vize;
+      };
+
+      checks = forAllSystems (system: {
+        vize = self.packages.${system}.vize;
+      });
     };
 }

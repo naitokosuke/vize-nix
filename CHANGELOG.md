@@ -13,6 +13,25 @@ This project uses the format: `<vize-version>-nix.<revision>`
 
 ## [Unreleased]
 
+## [0.276.0-nix.2] - 2026-07-04
+
+### Changed
+
+- Move version and per-platform hashes from `flake.nix` to `sources.json`; the update workflow now edits JSON with `jq` instead of `sed` on Nix code
+- Use a fixed `update-vize` branch for update PRs so a newer release supersedes an unmerged one
+- Simplify CI to a single macOS job
+
+### Added
+
+- `overlays.default` and `checks` flake outputs
+- Install-time `--version` smoke check via `versionCheckHook`
+- Weekly scheduled `flake.lock` update workflow
+
+### Removed
+
+- Linux support (`aarch64-linux`, `x86_64-linux`); this flake now targets `aarch64-darwin` only
+- `apps` flake output (`nix run` falls back to `packages.default`)
+
 ## [0.276.0-nix.1] - 2026-07-04
 
 ### Changed
@@ -621,7 +640,8 @@ This project uses the format: `<vize-version>-nix.<revision>`
 - CI workflow for build checks
 - Binary caching via Cachix with devenv
 
-[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.276.0-nix.1...HEAD
+[Unreleased]: https://github.com/naitokosuke/vize-nix/compare/0.276.0-nix.2...HEAD
+[0.276.0-nix.2]: https://github.com/naitokosuke/vize-nix/compare/0.276.0-nix.1...0.276.0-nix.2
 [0.276.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.272.1-nix.1...0.276.0-nix.1
 [0.272.1-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.271.0-nix.1...0.272.1-nix.1
 [0.271.0-nix.1]: https://github.com/naitokosuke/vize-nix/compare/0.268.0-nix.1...0.271.0-nix.1
